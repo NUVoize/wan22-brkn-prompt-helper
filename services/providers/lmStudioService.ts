@@ -102,9 +102,30 @@ async function chat({
     throw new Error(`LM Studio error: ${res.status} ${errText}`);
   }
 
-  const data = await res.json();
+  // Check if response is JSON
+  const contentType = res.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await res.text();
+    throw new Error(
+      `LM Studio returned non-JSON response. Is LM Studio running at ${baseUrl}? ` +
+      `Make sure you have:\n1. LM Studio installed and running\n2. A model loaded\n3. Server started in LM Studio\n` +
+      `Response preview: ${text.substring(0, 100)}...`
+    );
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (parseError) {
+    const text = await res.text().catch(() => 'Could not read response');
+    throw new Error(
+      `Failed to parse LM Studio response as JSON. Is LM Studio running at ${baseUrl}? ` +
+      `Response: ${text.substring(0, 200)}...`
+    );
+  }
+
   const content: string = data?.choices?.[0]?.message?.content ?? '';
-  if (!content) throw new Error('Empty response from LM Studio.');
+  if (!content) throw new Error('Empty response from LM Studio. Check if your model supports vision/multimodal inputs.');
   return content.trim();
 }
 
